@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Implementación y Evaluación del RED</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f2ead9; --card:#fbf7ee; --ink:#241f18; --muted:#6e6353;
+    --forest:#33503f; --clay:#a1382a; --ochre:#c1852c; --line:#ddd2ba;
+    --accent:#a1382a;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1b1712; --card:#241f18; --ink:#f2ead9; --muted:#b4a892;
+      --forest:#7fae95; --clay:#e17a63; --ochre:#e3a24f; --line:#3b3327;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1b1712; --card:#241f18; --ink:#f2ead9; --muted:#b4a892;
+    --forest:#7fae95; --clay:#e17a63; --ochre:#e3a24f; --line:#3b3327;
+  }
+  html{scroll-padding-top:env(safe-area-inset-top,0px); height:100%;}
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100%; background:var(--bg); color:var(--ink);
+    font-family:'Karla',system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 20px calc(28px + env(safe-area-inset-bottom,0px));
+    transition:background .4s ease;
+  }
+
+  .stage{width:100%; max-width:760px; display:flex; flex-direction:column; flex:1;}
+
+  .progress{width:100%; height:3px; background:var(--line); border-radius:2px; overflow:hidden; margin-bottom:22px;}
+  .progress-bar{height:100%; width:11.11%; background:var(--accent); transition:width .5s ease, background .5s ease;}
+
+  .deck{position:relative; flex:1; min-height:420px;}
+
+  .slide{
+    position:absolute; inset:0;
+    background:var(--card); border:1px solid var(--line); border-radius:3px;
+    padding:44px 46px 40px; display:flex; flex-direction:column; justify-content:center;
+    opacity:0; transform:translateY(14px); pointer-events:none;
+    transition:opacity .5s ease, transform .5s ease, border-top-color .5s ease;
+    border-top:4px solid var(--accent);
+    overflow:hidden;
+  }
+  .slide.active{opacity:1; transform:translateY(0); pointer-events:auto;}
+
+  .motif{position:absolute; top:22px; right:24px; width:54px; height:54px; opacity:.85; color:var(--accent);}
+  .weave{position:absolute; left:0; right:0; bottom:0; height:10px;
+    background:repeating-linear-gradient(115deg, var(--accent) 0 8px, transparent 8px 16px);
+    opacity:.5;}
+
+  .eyebrow{font-family:'Fraunces',Georgia,serif; font-style:italic; font-size:.98rem; color:var(--accent); margin:0 0 10px;}
+  h1{font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:2.15rem; line-height:1.15; margin:0 0 14px; max-width:88%;}
+  h2{font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:1.55rem; line-height:1.25; margin:0 0 22px; max-width:90%;}
+  .sub{color:var(--muted); font-size:1.02rem; margin-bottom:6px; max-width:92%;}
+
+  ul{margin:0; padding:0; list-style:none;}
+  li{position:relative; padding-left:26px; margin-bottom:13px; font-size:1.03rem; line-height:1.55; max-width:94%;}
+  li::before{content:""; position:absolute; left:0; top:.55em; width:9px; height:9px; background:var(--accent); border-radius:1px; transform:rotate(45deg);}
+  li.note{color:var(--accent); font-style:italic;}
+  li.note::before{background:transparent; border:1.5px solid var(--accent);}
+
+  .refs p{font-size:.94rem; line-height:1.6; color:var(--muted); margin:0 0 12px; padding-left:0;}
+  .refs p b{color:var(--ink); font-weight:600;}
+
+  .nav{
+    display:flex; align-items:center; justify-content:space-between;
+    width:100%; max-width:760px; margin-top:20px; gap:14px;
+  }
+  .navbtn{
+    background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:6px;
+    padding:10px 20px; font-size:.92rem; font-family:'Karla',sans-serif; font-weight:600;
+    cursor:pointer; transition:border-color .2s ease, transform .1s ease;
+  }
+  .navbtn:hover:not(:disabled){border-color:var(--accent);}
+  .navbtn:active:not(:disabled){transform:scale(.97);}
+  .navbtn:disabled{opacity:.3; cursor:default;}
+
+  .dots{display:flex; gap:7px;}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--line); border:none; padding:0; cursor:pointer;}
+  .dot.on{background:var(--accent); width:20px; border-radius:4px; transition:width .3s ease, background .3s ease;}
+
+  @media (max-width:600px){
+    .slide{padding:32px 26px 30px;}
+    h1{font-size:1.7rem;}
+    h2{font-size:1.3rem;}
+    .motif{width:40px; height:40px; top:16px; right:18px;}
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="progress"><div class="progress-bar" id="bar"></div></div>
+  <div class="deck" id="deck"></div>
+</div>
+<div class="nav">
+  <button class="navbtn" id="prev">← Anterior</button>
+  <div class="dots" id="dots"></div>
+  <button class="navbtn" id="next">Siguiente →</button>
+</div>
+
+<script>
+// ---- Iconos (SVG en línea, sin dependencias externas) ----
+const ICONS = {
+  territorio:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 36 16 20l7 9 6-10 13 17H6z"/><circle cx="34" cy="12" r="4"/></svg>',
+  hoja:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10 38C8 22 20 8 40 8c2 20-12 32-28 30z"/><path d="M12 36 34 12"/></svg>',
+  cubo:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M24 6 42 16v16L24 42 6 32V16z"/><path d="M6 16 24 26l18-10M24 26v16"/></svg>',
+  chispa:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M24 6c1 8 3 11 12 12-9 1-11 4-12 12-1-8-3-11-12-12 9-1 11-4 12-12z"/></svg>',
+  senal:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 34v6M20 26v14M30 18v22M40 10v30"/></svg>',
+  red:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="14" r="4"/><circle cx="36" cy="14" r="4"/><circle cx="24" cy="36" r="4"/><path d="M15 16l6 16M33 16l-6 16M16 14h16"/></svg>',
+  camara:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="6" y="14" width="36" height="24" rx="3"/><circle cx="24" cy="26" r="7"/><path d="M18 14l3-5h6l3 5"/></svg>',
+  lista:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 12h6M8 24h6M8 36h6"/><path d="M20 12h20M20 24h20M20 36h20"/><path d="M9 12l2 2 3-4"/></svg>',
+  libro:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M24 12c-4-3-10-4-16-3v27c6-1 12 0 16 3 4-3 10-4 16-3V9c-6-1-12 0-16 3z"/><path d="M24 12v27"/></svg>'
+};
+
+// ---- Contenido de las diapositivas ----
+const slides = [
+  { theme:'clay', icon:'territorio',
+    title:"Implementación y Evaluación del Recurso Educativo Digital",
+    sub:["Entregable 2 · Wilfran Doney Loboa",
+         "Maestría en Tecnologías Digitales Aplicadas a la Educación, CVUDES",
+         "Institución Educativa Técnica La Palomera, resguardo indígena de Huellas, Caloto (Cauca)"] },
+
+  { theme:'forest', icon:'hoja', eyebrow:"Propuesta 1",
+    title:"Guardianes del Bosque", bullets:[
+    "Área: Ciencias Naturales, grados 6° a 8°",
+    "Problema: los procesos ecológicos se enseñan desconectados de los saberes ambientales del territorio Nasa",
+    "Tecnología: Realidad Aumentada con CoSpaces Edu",
+    "Los estudiantes investigan especies del territorio con apoyo de mayores y sabedores, y construyen escenarios de RA que exploran entre equipos",
+    "Limitación principal: dispositivos con cámara y conectividad intermitente"] },
+
+  { theme:'ochre', icon:'cubo', eyebrow:"Propuesta 2",
+    title:"Geometría del Territorio", bullets:[
+    "Área: Matemáticas, grados 9° a 11°",
+    "Problema: la geometría abstracta se desconecta de las formas presentes en tejidos, cerámica y arquitectura del territorio",
+    "Tecnología: modelado 3D con Tinkercad",
+    "Cada equipo modela un objeto cultural y calcula área y volumen a partir del modelo digital",
+    "Limitación principal: sin impresora 3D en la institución, el ejercicio queda en lo digital"] },
+
+  { theme:'clay', icon:'chispa', eyebrow:"Reflexión crítica",
+    title:"El aporte no está en la tecnología", bullets:[
+    "CoSpaces Edu, Teachable Machine y Tinkercad valen por desplazar al estudiante hacia un rol activo de creación, no por su novedad",
+    "El modelo SAMR muestra que el cambio real ocurre cuando la tecnología rediseña la actividad, no cuando solo sustituye una herramienta tradicional (Donis de Santos, 2025)",
+    "En Exploradores de IA, el objetivo es comprender el aprendizaje automático; entrenar un modelo es el medio, no el fin"] },
+
+  { theme:'forest', icon:'senal', eyebrow:"Reflexión crítica",
+    title:"Un contexto con brecha digital real", bullets:[
+    "Teachable Machine funciona en equipos de gama media y no requiere cuenta, lo que la hace viable en la sala de informática",
+    "La brecha digital en comunidades indígenas rurales incluye también el uso, las habilidades y el acceso a cámara o micrófono",
+    "Un estudio sobre el pueblo nasa de Toribio, Cauca, documenta menor conectividad y mayor costo relativo del acceso a internet (Hurtado Moncada, 2021)",
+    "La evidencia de motivación disponible viene de un contexto urbano distinto (Aulaplaneta, 2025); en La Palomera todavía está por verificarse"] },
+
+  { theme:'ochre', icon:'red', eyebrow:"Reflexión crítica",
+    title:"Sesgo algorítmico y valor agregado", bullets:[
+    "Un conjunto de imágenes poco diverso del territorio puede producir un modelo sesgado, sin que el sesgo sea evidente para los estudiantes",
+    "La formación docente en ética de la IA es tan necesaria como la formación técnica (Flores-Vivar & García-Peñalvo, 2023)",
+    "El valor agregado real está en anclar un concepto abstracto, el aprendizaje automático, en una experiencia culturalmente significativa"] },
+
+  { theme:'clay', icon:'camara', eyebrow:"Implementación",
+    title:"Exploradores de IA: reconociendo nuestro territorio", bullets:[
+    "Recurso: clasificador de imágenes entrenado en Google Teachable Machine con elementos del territorio",
+    "Población: grados 9°, 10° y 11° de la I.E. Técnica La Palomera",
+    "Plan: introducción conceptual, salida de campo fotográfica, entrenamiento en equipos, prueba del modelo y socialización final"] },
+
+  { theme:'forest', icon:'lista', eyebrow:"Resultados de la evaluación",
+    title:"Rúbrica diligenciada por estudiantes y docentes", bullets:[
+    "Participantes: 7 estudiantes y 3 docentes de la I.E. Técnica La Palomera",
+    "Nueve dimensiones evaluadas: diseño pedagógico, usabilidad, contenido, tecnología empleada, potencial transformador, interactividad, accesibilidad, sostenibilidad y escalabilidad, valor agregado",
+    "Resultado: la totalidad de los participantes ubicó el recurso en el nivel Excelente en las nueve dimensiones, sin registros en Bueno o Regular",
+    {note:"Recomendación recogida: mantener siempre la tecnología subordinada a un objetivo pedagógico claro, evitando su uso solo por novedad o entretenimiento"}] },
+
+  { theme:'ochre', icon:'libro', title:"Referencias", refs:[
+    "<b>Aulaplaneta.</b> (2025, 13 de mayo). «El aprendizaje STEAM es significativo cuando conecta con la realidad»: La experiencia en el aula de Cristian Ruiz Reinales.",
+    "<b>Donis de Santos, X. G.</b> (2025). Más allá de la sustitución: implementación y retos del modelo SAMR en contextos educativos. Revista Científica Avances en Ciencia y Docencia, 2(Especial), 55-64.",
+    "<b>Flores-Vivar, J.-M., &amp; García-Peñalvo, F.-J.</b> (2023). Reflexiones sobre la ética, potencialidades y retos de la Inteligencia Artificial en el marco de la Educación de Calidad (ODS4). Comunicar, 31(74), 37-47.",
+    "<b>Hurtado Moncada, M. J.</b> (2021). Acceso a las tecnologías digitales para mujeres indígenas rurales: Barreras, catalizadores y sueños. Documentos de Trabajo, Fundación Carolina."] }
+];
+
+const THEME_VAR = {clay:'--clay', forest:'--forest', ochre:'--ochre'};
+
+let i = 0;
+const deck = document.getElementById('deck');
+const dotsWrap = document.getElementById('dots');
+const bar = document.getElementById('bar');
+const root = document.documentElement;
+
+// construir las diapositivas una sola vez en el DOM (mejor para animar)
+slides.forEach((s, idx) => {
+  const div = document.createElement('div');
+  div.className = 'slide';
+  div.dataset.theme = s.theme;
+
+  let inner = '<div class="motif">' + ICONS[s.icon] + '</div>';
+  if (s.eyebrow) inner += '<p class="eyebrow">' + s.eyebrow + '</p>';
+
+  if (idx === 0) {
+    inner += '<h1>' + s.title + '</h1>';
+    s.sub.forEach(t => inner += '<div class="sub">' + t + '</div>');
+  } else if (s.refs) {
+    inner += '<h2>' + s.title + '</h2><div class="refs">';
+    s.refs.forEach(r => inner += '<p>' + r + '</p>');
+    inner += '</div>';
+  } else {
+    inner += '<h2>' + s.title + '</h2><ul>';
+    s.bullets.forEach(b => {
+      if (typeof b === 'object') inner += '<li class="note">' + b.note + '</li>';
+      else inner += '<li>' + b + '</li>';
+    });
+    inner += '</ul>';
+  }
+  inner += '<div class="weave"></div>';
+  div.innerHTML = inner;
+  deck.appendChild(div);
+
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', 'Ir a la diapositiva ' + (idx + 1));
+  dot.onclick = () => go(idx);
+  dotsWrap.appendChild(dot);
+});
+
+const slideEls = [...deck.children];
+const dotEls = [...dotsWrap.children];
+
+function render(){
+  slideEls.forEach((el, idx) => el.classList.toggle('active', idx === i));
+  dotEls.forEach((d, idx) => d.classList.toggle('on', idx === i));
+  bar.style.width = ((i + 1) / slides.length * 100) + '%';
+  const themeVar = THEME_VAR[slides[i].theme];
+  root.style.setProperty('--accent', 'var(' + themeVar + ')');
+  document.getElementById('prev').disabled = (i === 0);
+  document.getElementById('next').disabled = (i === slides.length - 1);
+}
+
+function go(n){
+  if (n < 0 || n > slides.length - 1 || n === i) return;
+  i = n;
+  render();
+}
+
+document.getElementById('prev').onclick = () => go(i - 1);
+document.getElementById('next').onclick = () => go(i + 1);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') go(i + 1);
+  if (e.key === 'ArrowLeft') go(i - 1);
+  if (e.key === 'Home') go(0);
+  if (e.key === 'End') go(slides.length - 1);
+});
+
+// deslizar con el dedo en pantallas táctiles
+let touchX = null;
+deck.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, {passive:true});
+deck.addEventListener('touchend', (e) => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (dx < -40) go(i + 1);
+  if (dx > 40) go(i - 1);
+  touchX = null;
+}, {passive:true});
+
+render();
+</script>
+</body>
+</html>
